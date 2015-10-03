@@ -114,8 +114,22 @@ def breadthFirstSearch(problem):
     "*** YOUR CODE HERE ***"
     path = []
     if hasattr(problem, 'finishSearch'):
-        while len(problem.visitedCorners) < 4:
-            path += breadthFirstSearchNormal(problem)
+        pathSelectios = {}
+        pathCostMap = {}
+        newPathSelection = {} ####opt
+        for startPoint in problem.neededVisitedPoints:
+            if len(problem.startedPoints) < len(problem.neededVisitedPoints) - 1:
+                problem.startPoint = startPoint
+                pathSelectios[startPoint] = breadthFirstSearchNormal2(problem)
+                for endPoint, path in pathSelectios[startPoint]:
+                    pathCostMap[(startPoint, endPoint)] = path
+        print pathCostMap
+        ppc =  listAllPossiblePathCombination(problem, pathCostMap, problem.startingPosition, [problem.startingPosition], 0)
+        print ppc
+        minCost = min([pc[1] for pc in ppc])
+        minPath = [pc[0] for pc in ppc if pc[1] == minCost][0]
+        print "minCost, minPath", minCost, minPath
+        path =  buildPathByMap(pathCostMap, minPath)
     else:
         path = breadthFirstSearchNormal(problem)
     return path
@@ -134,6 +148,35 @@ def breadthFirstSearchNormal(problem):
         isGoal = problem.isGoalState(targetState)
         if isGoal:
                 return buildActionListFromBFSResult(visitedList,startState, targetState)
+        else:
+            for successor in problem.getSuccessors(targetState):
+                state = successor[0]
+                action = successor[1]
+                if state not in visitedList.keys():
+                    visitedList[state] = [targetState, action]
+                    q.push(state)
+
+def breadthFirstSearchNormal2(problem):
+    """Search the shallowest nodes in the search tree first."""
+    "*** YOUR CODE HERE ***"
+    from util import Queue
+    actionListMap = []
+    visitedList = {}
+    startState = problem.getStartState()
+    q = Queue()
+    q.push(startState)
+    visitedList[startState] = [None, None]
+    while not q.isEmpty():
+        targetState = q.pop()
+        isGoal = problem.isGoalState(targetState)
+        if isGoal == None:
+            actionList = buildActionListFromBFSResult(visitedList,startState, targetState)
+            actionListMap.append((targetState, actionList))
+        elif isGoal:
+            actionList = buildActionListFromBFSResult(visitedList,startState, targetState)
+            actionListMap.append((targetState, actionList))
+            print "Meet Goal"
+            return actionListMap
         else:
             for successor in problem.getSuccessors(targetState):
                 state = successor[0]
@@ -216,20 +259,120 @@ def nullHeuristic(state, problem=None):
 def aStarSearch(problem, heuristic=nullHeuristic):
     "*** YOUR CODE HERE ***"
     path = []
+    # if hasattr(problem, 'finishSearch'):
+    #     while len(problem.visitedCorners) < 4:
+    #         path += aStarSearchNormal(problem, heuristic)
+    # else:
+    #     path = aStarSearchNormal(problem, heuristic)
+    #
+    # print "Actual Cost", problem.getCostOfActions(path)
+    ##########################################
     if hasattr(problem, 'finishSearch'):
-        while len(problem.visitedCorners) < 4:
-            path += aStarSearchNormal(problem, heuristic)
-            # from searchAgents import cornersHeuristic
-            # for y in (range(5)):
-            #     print cornersHeuristic((problem.maxAxis[1] -1, y+5), problem)
+        pathSelectios = {}
+        pathCostMap = {}
+        problem.startedPoints = []
+        for startPoint in problem.neededVisitedPoints:
+            print "startPoint", startPoint
+            if len(problem.startedPoints) < len(problem.neededVisitedPoints) - 1:
+                problem.startPoint = startPoint
+                pathSelectios[startPoint] = aStarSearchNormal2(problem, heuristic)
+                for endPoint, path in pathSelectios[startPoint]:
+                    pathCostMap[(startPoint, endPoint)] = path
+        print pathCostMap
+        ppc =  listAllPossiblePathCombination(problem, pathCostMap, problem.startingPosition, [problem.startingPosition], 0)
+        print ppc
+        minCost = min([pc[1] for pc in ppc])
+        minPath = [pc[0] for pc in ppc if pc[1] == minCost][0]
+        print "minCost, minPath", minCost, minPath
+        path =  buildPathByMap(pathCostMap, minPath)
     else:
-        path = aStarSearchNormal(problem, heuristic)
-
-    print "Actual Cost", problem.getCostOfActions(path)
-
-
+        path = aStarSearchNormal2(problem, heuristic)[0][1]
     return path
 
+def buildPathByMap(pathMap, pointPath):
+    totalPath = []
+    print "range", range(len(pointPath) - 1)
+    for idx in range(len(pointPath) - 1):
+        newPath = []
+        startPoint = pointPath[idx]
+        endPoint = pointPath[idx + 1]
+        print "startPoint, endPoint", startPoint, endPoint
+        possibleConnection = [points for points in pathMap if startPoint in points and endPoint in points][0]
+        if(startPoint == possibleConnection[0]):
+            newPath = pathMap[possibleConnection]
+            print(newPath)
+        else:
+            newPath = reversePath(pathMap[possibleConnection])
+            print "reversed", (newPath)
+        totalPath += newPath
+    return totalPath
+
+
+def reversePath(path):
+    from game import Directions
+    reversedPath = []
+    for action in path:
+        reversedPath.append(Directions.REVERSE[action])
+    return reversedPath[::-1]
+
+#((p1, p2), cost)
+def listAllPossiblePathCombination(problem, pathCostMap, startPoint, path, cost):
+    allSelections = []
+    possibleConnection = [points for points in pathCostMap.keys() if startPoint in list(points)]
+    print possibleConnection
+    for points in possibleConnection:
+        possibleEndPoints = list(points)
+        possibleEndPoints.remove(startPoint)
+        endPoint = possibleEndPoints[0]
+        if(endPoint not in path):
+            newCost = len(pathCostMap[points]) + cost
+            newPath = path[:]
+            newPath.append(endPoint)
+            if len(newPath) == len(problem.neededVisitedPoints):
+                return (newPath, newCost)
+            else:
+                selections = listAllPossiblePathCombination(problem, pathCostMap, endPoint, newPath, newCost)
+                if len(newPath) == len(problem.neededVisitedPoints) - 1:
+                    allSelections.append(selections)
+                else:
+                    for pc in selections:
+                        allSelections.append(pc)
+    return allSelections
+
+
+def aStarSearchNormal2(problem, heuristic=nullHeuristic):
+    from util import PriorityQueueWithFunction
+    actionListMap = []
+    visitedList = {}
+    startState = problem.getStartState()
+    q = PriorityQueueWithFunction(lambda a: a.cost + a.heuristic)#proposition to priority
+    q.push(aStarPriorityQueueMember(startState, None, None, 0, heuristic(startState, problem)))
+    targetState = None
+    while not q.isEmpty():
+        targetStateAndCost = q.pop()
+        targetState = targetStateAndCost.state
+        targetPrevState = targetStateAndCost.prevState
+        targetAction = targetStateAndCost.action
+        targetPathCost = targetStateAndCost.cost
+        if targetState not in visitedList.keys(): #why?
+                visitedList[targetState] = [targetPrevState, targetAction, targetPathCost]
+                isGoal = problem.isGoalState(targetState)
+                if isGoal == None:
+                    actionList = buildActionListFromAStarResult(visitedList,startState, targetState)
+                    actionListMap.append((targetState, actionList))
+                elif isGoal:
+                    actionList = buildActionListFromAStarResult(visitedList,startState, targetState)
+                    actionListMap.append((targetState, actionList))
+                    print "Meet Goal"
+                    return actionListMap
+                else:
+                    for successor in problem.getSuccessors(targetState):
+                        state = successor[0]
+                        action = successor[1]
+                        weight = successor[2]
+                        cost =  targetPathCost + weight
+                        q.push(aStarPriorityQueueMember(state, targetState, action, cost, heuristic(state, problem)))
+    print "visitedCorners", problem.visitedCorners
 
 def aStarSearchNormal(problem, heuristic=nullHeuristic):
     from util import PriorityQueueWithFunction
@@ -249,7 +392,6 @@ def aStarSearchNormal(problem, heuristic=nullHeuristic):
                 if problem.isGoalState(targetState):
                     actionList = buildActionListFromAStarResult(visitedList,startState, targetState)
                     return actionList
-
                 else:
                     for successor in problem.getSuccessors(targetState):
                         state = successor[0]

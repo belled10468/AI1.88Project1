@@ -284,65 +284,19 @@ class CornersProblem(search.SearchProblem):
         for corner in self.corners:
             if not startingGameState.hasFood(*corner):
                 print 'Warning: no food in corner ' + str(corner)
-        self._expanded = 0 # DO NOT CHANGE; Number of search nodes expanded
-        # Please add any code here which you would like to use
-        # in initializing the problem
-
-        # self.walls = gameState.getWalls()
-        # self.startState = gameState.getPacmanPosition()
-        # if start != None: self.startState = start
-        # self.goal = goal
-        # self.costFn = costFn
-        # self.visualize = visualize
-        # if warn and (gameState.getNumFood() != 1 or not gameState.hasFood(*goal)):
-        #     print 'Warning: this does not look like a regular search maze'
-
-        # For display purposes
         self._visited, self._visitedlist, self._expanded = {}, [], 0 # DO NOT CHANGE
 
         "*** YOUR CODE HERE ***"
-        self.startPoint = None
+        self.startPoint = self.startingPosition
         self.visitedCorners = []
         self.tempStopPoint = None
         self.nextGoal = None
         self.nextGoalSelections = []
         self.finishSearch = False
         self.maxAxis = (right, top)
-
-
-        # import math
-        # xMidPoint = int(math.ceil( (1 + right) * 0.5 )) #3
-        # yMidPoint = int(math.ceil( (1 + top) * 0.5 )) #3
-        # areas = [((1, 1), (xMidPoint, yMidPoint)),((xMidPoint,1), (right + 1, yMidPoint)), ((1, yMidPoint), (xMidPoint, top + 1)), ((xMidPoint, yMidPoint), (right + 1, top + 1))]
-        # wallCountPerArea = {}
-        # for area in areas:
-        #     for x in range(area[0][0], area[1][0]):
-        #         for y in range(area[0][1], area[1][1]):
-        #             if(self.walls[x][y]):
-        #                 if(area not in wallCountPerArea.keys()):
-        #                     wallCountPerArea[area] = 1
-        #                 else:
-        #                     wallCountPerArea[area] += 1
-        #
-        # print wallCountPerArea
-
-
-        #precalculate optimized visited order
-        # pathSelections = {}
-        # needVisitedPoints = list(self.corners)
-        # needVisitedPoints.append(self.startingPosition)
-        # for visitedPoint in needVisitedPoints:
-        #     pathSelections[visitedPoint] = [(self.wallsCountHeuristic(visitedPoint ,corner, self.walls), corner) for corner in self.corners if corner != visitedPoint]
-        # for ps in pathSelections.keys():
-        #     print (ps, pathSelections[ps])
-        # selections = self.exploreAllPossiblePath(pathSelections, self.startingPosition, list(self.corners), [self.startingPosition], 0)
-        # print "wallsCountHeuristic result"
-        # for selection in selections:
-        #     print (selection)
-        #
-        # minCost = min([selection[1] for selection in selections])
-        #
-        # print "Best Path", [selection[0] for selection in selections if selection[1] == minCost]
+        self.neededVisitedPoints = [self.startingPosition] + list(self.corners)
+        self.startedPoints = []
+        print "neededVisitedPoints", self.neededVisitedPoints
 
 
 
@@ -371,19 +325,9 @@ class CornersProblem(search.SearchProblem):
         """
         "*** YOUR CODE HERE ***"
 
-
-        def eulicidean(xy1, xy2):
-            return ( (xy1[0] - xy2[0]) ** 2 + (xy1[1] - xy2[1]) ** 2 ) ** 0.5
-
-        if self.tempStopPoint is None:
-            self.startPoint =  self.startingPosition
-        else:
-            self.startPoint =  self.tempStopPoint
-        #find Goal by heuristic
-        eulicideanList = [(eulicidean(corner, self.startPoint), corner) for corner in self.corners if corner not in self.visitedCorners]
-
-        minEu = min([nextGoal[0] for nextGoal in eulicideanList])
-        self.nextGoalSelections = [nextGoal[1] for nextGoal in eulicideanList if nextGoal[0] == minEu]
+        self.startedPoints.append(self.startPoint)
+        self.visitedCorners = self.startedPoints[:]
+        print "startedPoints", self.startedPoints
         return self.startPoint
 
 
@@ -468,55 +412,17 @@ class CornersProblem(search.SearchProblem):
         Returns whether this search state is a goal state of the problem.
         """
         "*** YOUR CODE HERE ***"
-
-        #Accidentally eat part
-        #remember direction
-        if len(self.visitedCorners) == len(self.corners):
-            self.finishSearch = True
-            return None
-        isGoal = state in self.nextGoalSelections and state not in self.visitedCorners and (self.nextGoal is None or state == self.nextGoal)
-        #print state in self.corners, state not in self.visitedCorners, self.nextGoal is None or state == self.nextGoal, self.nextGoal
-        if isGoal:
-            diffWithLastPoint = (abs(state[0] - self.startPoint[0]), abs(state[1] - self.startPoint[1]))
-            print diffWithLastPoint
+        isUnvisitedCorner = state in self.neededVisitedPoints and state not in self.visitedCorners and state != self.startPoint
+        if isUnvisitedCorner:
             self.visitedCorners.append(state)
-            self.tempStopPoint = state
-            for corner in self.nextGoalSelections:
-                if corner != state and corner not in self.visitedCorners:
-                    if diffWithLastPoint[0] > diffWithLastPoint[1]:
-                        if corner[0] == state[0]:
-                            self.nextGoal = corner
-                            break
-                    else:
-                        if corner[1] == state[1]:
-                            self.nextGoal = corner
-                            break
-        return isGoal
+        else:
+            return False
+        if len(self.visitedCorners) == 5:
+            return True
+        else:
+            return None
 
     def getSuccessors(self, state):
-        """
-        Returns successor states, the actions they require, and a cost of 1.
-
-         As noted in search.py:
-            For a given state, this should return a list of triples, (successor,
-            action, stepCost), where 'successor' is a successor to the current
-            state, 'action' is the action required to get there, and 'stepCost'
-            is the incremental cost of expanding to that successor
-        """
-        #
-        # successors = []
-        # for action in [Directions.NORTH, Directions.SOUTH, Directions.EAST, Directions.WEST]:
-        #     # Add a successor state to the successor list if the action is legal
-        #     # Here's a code snippet for figuring out whether a new position hits a wall:
-        #     #   x,y = currentPosition
-        #     #   dx, dy = Actions.directionToVector(action)
-        #     #   nextx, nexty = int(x + dx), int(y + dy)
-        #     #   hitsWall = self.walls[nextx][nexty]
-        #
-        #     "*** YOUR CODE HERE ***"
-        #
-        # self._expanded += 1 # DO NOT CHANGE
-        # return successors
 
         successors = []
         for action in [Directions.NORTH, Directions.SOUTH, Directions.EAST, Directions.WEST]:
@@ -542,12 +448,16 @@ class CornersProblem(search.SearchProblem):
         Returns the cost of a particular sequence of actions.  If those actions
         include an illegal move, return 999999.  This is implemented for you.
         """
-        if actions == None: return 999999
+        if actions == None:
+            print "None Action"
+            return 999999
         x,y= self.startingPosition
         for action in actions:
             dx, dy = Actions.directionToVector(action)
             x, y = int(x + dx), int(y + dy)
-            if self.walls[x][y]: return 999999
+            if self.walls[x][y]:
+                print "Hit wall"
+                return 999999
         return len(actions)
 
 
@@ -569,29 +479,16 @@ def cornersHeuristic(state, problem):
 
     "*** YOUR CODE HERE ***"
     def eulicidean(xy1, xy2):
-            return ( (xy1[0] - xy2[0]) ** 2 + (xy1[1] - xy2[1]) ** 0.5 )
+            return ( (xy1[0] - xy2[0]) ** 2 + (xy1[1] - xy2[1]) ** 2 ) ** 0.5
     def manhattan(xy1, xy2):
         return abs(xy1[0] - xy2[0]) + abs(xy1[1] - xy2[1])
     def diff(xy1, xy2):
             return ((xy1[0] - xy2[0]), (xy1[1] - xy2[1]))
-
-
-
+    h = 0
     cornerEuList = [(eulicidean(state, corner), corner) for corner in problem.corners if corner not in problem.visitedCorners]
-    h =  min([ce[0] for ce in cornerEuList])
+    if len(cornerEuList) > 0:
+        h = min([ce[0] for ce in cornerEuList])
     closestCorners = [ ce[1] for ce in cornerEuList if ce[0] == h]
-
-    #close to diagnol
-    startVector = diff(closestCorners[0], problem.startPoint)
-    currentVector = diff(state, problem.startPoint)
-
-    oh = h + eulicidean(startVector, currentVector)
-
-    #When two corners are the same
-    #find walls at two sides
-    # wall count
-
-
 
     return h # Default to trivial solution
 
